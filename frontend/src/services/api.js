@@ -35,6 +35,7 @@ export const tenders = {
   getBids: (id) => request(`/tenders/${id}/bids`),
   placeBid: (id, data) => request(`/tenders/${id}/bids`, { method: "POST", body: JSON.stringify(data) }),
   acceptBid: (tenderId, bidId) => request(`/tenders/${tenderId}/bids/${bidId}/accept`, { method: "POST" }),
+  myBids: () => request("/tenders/my-bids"),
 };
 
 export const portfolio = {

@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tender import Tender, TenderBid, TenderStatus, BidStatus
 from app.models.category import Category
-from app.schemas.tender import TenderCreate, TenderOut, BidCreate, BidOut
+from app.schemas.tender import TenderCreate, TenderOut, BidCreate, BidOut, MyBidOut
 from app.services.auth import require_auth, get_current_user
 
 router = APIRouter(prefix="/api/tenders", tags=["tenders"])
@@ -58,6 +58,38 @@ def list_tenders(
 
     tenders = q.order_by(Tender.created_at.desc()).offset(skip).limit(limit).all()
     return [_tender_to_out(t) for t in tenders]
+
+
+@router.get("/my-bids", response_model=list[MyBidOut])
+def my_bids(user: User = Depends(require_auth), db: Session = Depends(get_db)):
+    bids = (
+        db.query(TenderBid)
+        .options(joinedload(TenderBid.bidder), joinedload(TenderBid.tender))
+        .filter(TenderBid.bidder_id == user.id)
+        .order_by(TenderBid.created_at.desc())
+        .all()
+    )
+    return [
+        MyBidOut(
+            id=b.id,
+            tender_id=b.tender_id,
+            bidder_id=b.bidder_id,
+            amount=b.amount,
+            currency=b.currency,
+            message=b.message,
+            estimated_days=b.estimated_days,
+            status=b.status,
+            created_at=b.created_at,
+            bidder_name=b.bidder.full_name if b.bidder else "",
+            bidder_rating=b.bidder.rating if b.bidder else 0,
+            bidder_company=b.bidder.company_name if b.bidder else None,
+            tender_title=b.tender.title if b.tender else "",
+            tender_status=b.tender.status if b.tender else None,
+            tender_budget_min=b.tender.budget_min if b.tender else None,
+            tender_budget_max=b.tender.budget_max if b.tender else None,
+        )
+        for b in bids
+    ]
 
 
 @router.get("/{tender_id}", response_model=TenderOut)

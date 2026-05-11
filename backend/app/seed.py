@@ -146,9 +146,17 @@ def seed_all():
              is_verified=True, rating=42),
     ]
 
-    db.add_all(customers + manufacturers)
+    test_user = User(
+        email="test@craft.ua", hashed_password=PASSWORD, full_name="Тестовий Майстер",
+        role=UserRole.MANUFACTURER, company_name="TestCraft Studio", city="Київ",
+        phone="+380991234567", bio="Універсальна майстерня — металообробка, зварювання, виготовлення харчового обладнання. 10 років досвіду.",
+        avatar_url=f"{U}/photo-1566492031773-4f4e44671857?w=150&h=150&fit=crop&crop=face",
+        is_verified=True, rating=91,
+    )
+
+    db.add_all(customers + manufacturers + [test_user])
     db.commit()
-    for u in customers + manufacturers:
+    for u in customers + manufacturers + [test_user]:
         db.refresh(u)
 
     cats = {c.slug: c for c in db.query(Category).all()}
@@ -345,6 +353,76 @@ def seed_all():
             created_at=now - timedelta(days=portfolio_data.index(pd)),
         )
         db.add(item)
+
+    # ── Test user content ─────────────────────────
+    # Tender created by test user (as customer)
+    test_tender = Tender(
+        title="Ємність для бродіння 60л з краном",
+        description="Потрібна ємність з нержавійки для бродіння сидру.\n\n"
+                    "Вимоги:\n- Об'єм: 60л\n- Матеріал: AISI 304\n- Кришка з гідрозатвором\n"
+                    "- Кран-метелик внизу (DN25)\n- Термометр вбудований\n- Ніжки регульовані",
+        owner_id=test_user.id,
+        category_id=cats["food-equipment"].id,
+        budget_min=5000, budget_max=12000,
+        currency="UAH", status=TenderStatus.ACTIVE,
+        image_url=IMG["brewery_tanks"],
+        deadline=now + timedelta(days=20), location="Київ",
+        created_at=now - timedelta(hours=5),
+    )
+    db.add(test_tender)
+    db.commit()
+    db.refresh(test_tender)
+
+    for mfr, amt, msg, days in [
+        (manufacturers[0], 9800, "Маю досвід виготовлення подібних ємностей. AISI 304, TIG-зварювання.", 12),
+        (manufacturers[1], 8500, "Можу зробити за тиждень. Є матеріал на складі.", 7),
+        (manufacturers[7], 5500, "Stainless steel fermenter. Shipping 14 days.", 25),
+    ]:
+        db.add(TenderBid(
+            tender_id=test_tender.id, bidder_id=mfr.id,
+            amount=amt, currency="UAH", message=msg, estimated_days=days,
+            status=BidStatus.PENDING, created_at=test_tender.created_at + timedelta(hours=2),
+        ))
+
+    # Bids placed BY test user on other tenders
+    for tender, amt, msg, days in [
+        (tender_objs[0], 48000, "Маю готове рішення для пивоварні 100л. Повна комплектація, нержавійка AISI 304. Гарантія 2 роки.", 25),
+        (tender_objs[1], 22000, "Виготовлю мідну колону аламбік-типу. 50л куб, змієвиковий холодильник. Пайка срібним припоєм.", 16),
+        (tender_objs[7], 29000, "Камера холодного копчення з нержавійки. Димогенератор, Wi-Fi термометр, оглядове вікно.", 14),
+        (tender_objs[10], 23000, "Шнековий прес з загартованої сталі. Продуктивність 12кг/год. Повна збірка + інструкція.", 18),
+    ]:
+        db.add(TenderBid(
+            tender_id=tender.id, bidder_id=test_user.id,
+            amount=amt, currency="UAH", message=msg, estimated_days=days,
+            status=BidStatus.PENDING, created_at=tender.created_at + timedelta(hours=3),
+        ))
+
+    # Portfolio items for test user
+    test_portfolio = [
+        dict(title="Пивоварня крафтова 150л",
+             description="Повний комплект: затирочний котел, фільтр-чан, варильник, 2 ферментатори. "
+                         "Нержавійка AISI 304, TIG-зварювання, полірування внутрішніх швів.",
+             images=[IMG["brewery_tanks"]],
+             tags=["пивоварня", "нержавійка", "AISI 304"], materials="AISI 304", production_time_days=28),
+        dict(title="Мідний аламбік 20л",
+             description="Класичний мідний дистилятор ручної роботи. Перегонний куб 20л, "
+                         "колона з дефлегматором, змієвиковий холодильник. Пайка срібним припоєм.",
+             images=[IMG["copper_stills"]],
+             tags=["дистиляція", "мідь", "аламбік", "ручна робота"], materials="Мідь М1, срібний припій", production_time_days=14),
+        dict(title="Коптильна камера 0.5м³",
+             description="Камера холодного/гарячого копчення. Нержавіюча сталь, димогенератор на тріскі, "
+                         "цифровий контролер температури, оглядове вікно.",
+             images=[IMG["smoked_meat"]],
+             tags=["коптильня", "нержавійка", "холодне копчення"], materials="AISI 304", production_time_days=10),
+    ]
+    for p in test_portfolio:
+        db.add(PortfolioItem(
+            owner_id=test_user.id, title=p["title"],
+            description=p["description"], images=p["images"],
+            tags=p["tags"], materials=p["materials"],
+            production_time_days=p["production_time_days"],
+            created_at=now - timedelta(days=test_portfolio.index(p) + 1),
+        ))
 
     db.commit()
     db.close()

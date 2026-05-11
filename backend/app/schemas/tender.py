@@ -59,3 +59,10 @@ class BidOut(BaseModel):
     bidder_company: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class MyBidOut(BidOut):
+    tender_title: str = ""
+    tender_status: Optional[TenderStatus] = None
+    tender_budget_min: Optional[float] = None
+    tender_budget_max: Optional[float] = None

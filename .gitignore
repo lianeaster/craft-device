@@ -4,6 +4,15 @@
 # Node
 node_modules/
 
+# PyInstaller
+dist/
+build/
+release/
+*.spec.tmp
+
+# Frontend build (generated)
+frontend/dist/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
